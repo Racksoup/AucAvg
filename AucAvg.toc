@@ -1,0 +1,12 @@
+## Interface: 11503
+## Title: AucAvg
+## Author: WindFish
+## DefaultState: enabled
+## SavedVariables: AucAvgDB
+## OptionalDeps: Ace3
+## X-Embeds: Ace3
+## Dependencies: AuctionDB
+
+embeds.xml
+
+core.lua
