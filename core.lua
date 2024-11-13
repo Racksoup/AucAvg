@@ -15,18 +15,12 @@ end
 local function parseData(dataString)
   local results = {}
   for itemID, restOfData in dataString:gmatch("i(%d+)[^/]*%/([^%s]+)") do
-    print(restOfData)
-   
-      -- Initialize a variable to track the lowest fourth value
-    local lowestFourthValue = math.huge  -- Start with infinity
+    local lowestFourthValue = math.huge 
 
-    -- Split restOfData by '&' and process each entry
     for entry in restOfData:gmatch("([^&]+)") do
-      -- Find the fourth value in this entry
       local fourthValue = select(4, entry:match("([^,]+),([^,]+),([^,]+),([^,]+)"))
       
       if fourthValue then
-        -- Convert fourthValue to a number and check if it's the lowest found
         fourthValue = tonumber(fourthValue)
         if fourthValue and fourthValue < lowestFourthValue then
           lowestFourthValue = fourthValue
@@ -41,17 +35,13 @@ local function parseData(dataString)
     end
   end
 
-
-
   for key, prices in pairs(results) do
-    local priceHolder = math.huge  -- Initialize with a very large number
+    local priceHolder = math.huge
     for _, price in ipairs(prices) do
       if price < priceHolder then
         priceHolder = price
       end
     end
-    -- Assuming prices is a table, replace it with the lowest price found
-    -- This will overwrite the original table, storing only the lowest price
     results[key] = {priceHolder}
   end
 
@@ -67,11 +57,13 @@ function AA:CalculateAverage(input)
       break
     end
   end
+  -- get all the recent auctionHouse scan data's
+  -- run parseData func on all dataStrings
+  -- merge results of parseData
+  -- save it 
+
   if dataString then
     AA.db.realm.parsedData = parseData(dataString)
   end
   print("Finished Calculating Average!")
 end
-
--- works for restOfData "i(%d+)[^/]+/(.-),%s*i"
--- works for getting all entries "i(%d+)[^/]*%/(.-),%s*"
