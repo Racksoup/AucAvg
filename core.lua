@@ -49,21 +49,53 @@ local function parseData(dataString)
 end
 
 function AA:CalculateAverage(input)
-  print("Calculating Average...")
-  local dataString = ""
-  for _, newest in pairs(AuctionDBSaved.ah) do
-    if newest.ts == 1731482284 then
-      dataString = newest.data
-      break
+  print("Calculating Average...") 
+  local scanData = {}
+  local ts = time() - (7 * 24 * 60 * 60)
+  for _, data in pairs(AuctionDBSaved.ah) do
+    if data.ts > ts then 
+      table.insert(scanData, data)
     end
   end
-  -- get all the recent auctionHouse scan data's
-  -- run parseData func on all dataStrings
-  -- merge results of parseData
-  -- save it 
 
-  if dataString then
-    AA.db.realm.parsedData = parseData(dataString)
+  local scanResults = {}
+  if #scanData >= 1 then 
+    for _, data in ipairs(scanData) do
+      table.insert(scanResults, parseData(data.data))
+    end
+
+  AA.db.realm.parsedData = AA:mergeAndAverageTables(unpack(scanResults))
   end
+
   print("Finished Calculating Average!")
+end
+
+function AA:mergeAndAverageTables(...)
+    local mergedData = {}
+    local countData = {}
+
+    -- Iterate over all tables provided as arguments
+    for _, tbl in ipairs({...}) do
+        for itemID, values in pairs(tbl) do
+            -- Initialize in mergedData and countData if not already present
+            if not mergedData[itemID] then
+                mergedData[itemID] = 0
+                countData[itemID] = 0
+            end
+            -- Sum the values in the sub-table and count the entries
+            for _, price in ipairs(values) do
+                mergedData[itemID] = mergedData[itemID] + price
+                countData[itemID] = countData[itemID] + 1
+            end
+        end
+    end
+
+    -- Calculate the average for each item
+    for itemID, total in pairs(mergedData) do
+        if countData[itemID] > 0 then
+            mergedData[itemID] = total / countData[itemID]
+        end
+    end
+
+    return mergedData
 end
