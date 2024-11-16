@@ -74,21 +74,6 @@ function AA:CalculateAverage(input)
     dailyAverages[day] = AA:mergeAndAverageDailyTables(unpack(results))
   end
 
-  -- print ****************************
-  for day, data in pairs(dailyAverages) do
-    print("Day:", day)
-    
-    local count = 0
-    for itemID, prices in pairs(data) do
-      print("  ItemID:", itemID, "Price:", prices) -- Adjust as needed if `prices` is a table
-      count = count + 1
-      if count >= 5 then  -- Limit to 5 items per day
-        print("  ... and more")
-        break
-      end
-    end
-  end
-
   -- Merge daily averages into the final 7-day average
   AA.db.realm.parsedData = AA:mergeAndAverageWeeklyTables(dailyAverages)
 
@@ -96,62 +81,50 @@ function AA:CalculateAverage(input)
 end
 
 function AA:mergeAndAverageDailyTables(...)
-    local mergedData = {}
-    local countData = {}
+  local mergedData = {}
+  local countData = {}
 
-    -- Iterate over all tables provided as arguments
-    for _, tbl in ipairs({...}) do
-        for itemID, values in pairs(tbl) do
-            -- Initialize in mergedData and countData if not already present
-            if not mergedData[itemID] then
-                mergedData[itemID] = 0
-                countData[itemID] = 0
-            end
-            -- Sum the values in the sub-table and count the entries
-            for _, price in ipairs(values) do
-                mergedData[itemID] = mergedData[itemID] + price
-                countData[itemID] = countData[itemID] + 1
-            end
-        end
+  -- Iterate over all tables provided as arguments
+  for _, tbl in ipairs({...}) do
+    for itemID, values in pairs(tbl) do
+      -- Initialize in mergedData and countData if not already present
+      if not mergedData[itemID] then
+        mergedData[itemID] = 0
+        countData[itemID] = 0
+      end
+      -- Sum the values in the sub-table and count the entries
+      for _, price in ipairs(values) do
+        mergedData[itemID] = mergedData[itemID] + price
+        countData[itemID] = countData[itemID] + 1
+      end
     end
+  end
 
-    -- Calculate the average for each item
-    for itemID, total in pairs(mergedData) do
-        if countData[itemID] > 0 then
-            mergedData[itemID] = total / countData[itemID]
-        end
+  -- Calculate the average for each item
+  for itemID, total in pairs(mergedData) do
+    if countData[itemID] > 0 then
+      mergedData[itemID] = total / countData[itemID]
     end
+  end
 
-    return mergedData
+  return mergedData
 end
 
 function AA:mergeAndAverageWeeklyTables(...)
   local mergedData = {}
   local countData = {}
 
-  -- Unpack and print the arguments properly
-  local args = {...}
-  print("Received arguments:")
-  for i, dailyAverage in ipairs(args) do
-    print("Table " .. i .. ":")
-    for itemID, avgPrice in pairs(dailyAverage) do
-      print("  ItemID:", itemID, "Price:", avgPrice)
-    end
-  end
-
   -- Process each table or numeric average independently
-  for _, dailyAverage in pairs(args) do
-    if dailyAverage then
-      for itemID, avgPrice in pairs(dailyAverage) do
-        if not mergedData[itemID] then
-          mergedData[itemID] = 0
-          countData[itemID] = 0
-        end
-
-        -- Add the daily average price directly
-        mergedData[itemID] = mergedData[itemID] + avgPrice
-        countData[itemID] = countData[itemID] + 1
+  for date, priceTable in pairs(...) do
+    -- Sum the values in the sub-table and count the entries
+    for itemID, price in pairs(priceTable) do
+      if not mergedData[itemID] then
+        mergedData[itemID] = 0
+        countData[itemID] = 0
       end
+
+      mergedData[itemID] = mergedData[itemID] + price
+      countData[itemID] = countData[itemID] + 1
     end
   end
 
@@ -165,3 +138,31 @@ function AA:mergeAndAverageWeeklyTables(...)
   return mergedData
 end
 
+AucAvgGetAuctionInfoByLink = function(link)
+  local itemID = select(2, strsplit(":", link)) -- Extract item ID from the item link
+  if not itemID then
+      return nil
+  end
+  local auctionInfo = AA.db.realm.parsedData[itemID]
+  if auctionInfo then
+      return { sevenDayAvg = auctionInfo }
+  end
+  return nil
+end
+
+  -- AucAvg
+--  if Addon.IsEnabled("AucAvg") and AucAvgGetAuctionInfoByLink then
+--    CustomString.InvalidateCache("SevenDayAvg")
+--    local function PriceFuncHelper(itemString, key)
+--      local itemLink = ItemInfo.GetLink(itemString)
+--			if not itemLink then
+--				return nil
+--			end
+--			local info = AucAvgGetAuctionInfoByLink(itemLink)
+--			return info and info[key] or nil
+--    end
+--    local function SevenDayAvgFunc(itemString)
+--      return PriceFuncHelper(itemString, "sevenDayAvg")
+--    end
+--    CustomString.RegisterSource("External", "SevenDayAvg", L["Seven Day Avg"], SevenDayAvgFunc, CustomString.SOURCE_TYPE.PRICE_DB) 
+--  end
