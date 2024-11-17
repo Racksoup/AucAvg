@@ -3,7 +3,7 @@ AA_GUI = {}
 
 local defaults = {
   realm = {
-    parsedData = {}
+    sevenDayAvg = {}
   }
 }
 
@@ -12,7 +12,7 @@ function AA:OnInitialize()
   AA:RegisterChatCommand("aa", "CalculateAverage")
 end
 
-local function parseData(dataString)
+local function parseData(dataString, realm, faction)
   local results = {}
   for itemID, restOfData in dataString:gmatch("i(%d+)[^/]*%/([^%s]+)") do
     local lowestFourthValue = math.huge 
@@ -50,10 +50,12 @@ end
 
 function AA:CalculateAverage(input)
   print("Calculating Average...") 
+  local realm = GetNormalizedRealmName()
+  local faction = UnitFactionGroup("PLAYER")
   local scanData = {}
   local ts = time() - (7 * 24 * 60 * 60)
   for _, data in pairs(AuctionDBSaved.ah) do
-    if data.ts > ts then 
+    if (data.ts > ts) and (data.realm == realm) and (data.faction == faction) then 
       table.insert(scanData, data)
     end
   end
@@ -64,7 +66,7 @@ function AA:CalculateAverage(input)
     for _, data in ipairs(scanData) do
       local day = date("%Y-%m-%d", data.ts) -- Group by day
       dailyResults[day] = dailyResults[day] or {}
-      table.insert(dailyResults[day], parseData(data.data))
+      table.insert(dailyResults[day], parseData(data.data, realm, faction))
     end
   end
 
@@ -74,8 +76,9 @@ function AA:CalculateAverage(input)
     dailyAverages[day] = AA:mergeAndAverageDailyTables(unpack(results))
   end
 
+
   -- Merge daily averages into the final 7-day average
-  AA.db.realm.parsedData = AA:mergeAndAverageWeeklyTables(dailyAverages)
+  AA.db.realm.sevenDayAvg[realm .. "-" .. faction] = AA:mergeAndAverageWeeklyTables(dailyAverages)
 
   print("Finished Calculating Average!")
 end
@@ -140,10 +143,12 @@ end
 
 AucAvgGetAuctionInfoByLink = function(link)
   local itemID = select(2, strsplit(":", link)) -- Extract item ID from the item link
+  local realm = GetNormalizedRealmName()
+  local faction = UnitFactionGroup("PLAYER")
   if not itemID then
       return nil
   end
-  local auctionInfo = AA.db.realm.parsedData[itemID]
+  local auctionInfo = AA.db.realm.sevenDayAvg[realm .. "-" .. faction][itemID]
   if auctionInfo then
       return { sevenDayAvg = auctionInfo }
   end
