@@ -1,15 +1,15 @@
-AA = LibStub("AceAddon-3.0"):NewAddon("AucAvg", "AceConsole-3.0", "AceSerializer-3.0")
-AA_GUI = {}
+local AA = LibStub("AceAddon-3.0"):NewAddon("AucAvg", "AceConsole-3.0", "AceSerializer-3.0")
+local AA_GUI = {}
 
 local defaults = {
   realm = {
-    sevenDayAvg = {}
   }
 }
 
 function AA:OnInitialize()
   self.db = LibStub("AceDB-3.0"):New("AucAvgDB", defaults, true)
   AA:RegisterChatCommand("aa", "CalculateAverage")
+  --self.db:ResetDB()
 end
 
 local function parseData(dataString, realm, faction)
@@ -52,38 +52,52 @@ function AA:CalculateAverage(input)
   print("Calculating Average...") 
   local realm = GetNormalizedRealmName()
   local faction = UnitFactionGroup("PLAYER")
-  local scanData = {}
-  local ts = time() - (7 * 24 * 60 * 60)
-  for _, data in pairs(AuctionDBSaved.ah) do
-    if (data.ts > ts) and (data.realm == realm) and (data.faction == faction) then 
-      table.insert(scanData, data)
+  local timeSpans = {7, 14, 30, 90, 180}
+  local now = time()
+
+  -- make all averages
+  for _, days in ipairs(timeSpans) do  
+    local ts = now - (days * 24 * 60 * 60)
+    local scanData = {}
+
+    -- get scans within date range, correct realm
+    for _, data in pairs(AuctionDBSaved.ah) do
+      if (data.ts > ts) and (data.realm == realm) and (data.faction == faction) then 
+        table.insert(scanData, data)
+      end
     end
-  end
 
-  -- Organize scans by day
-  local dailyResults = {}
-  if #scanData >= 1 then
-    for _, data in ipairs(scanData) do
-      local day = date("%Y-%m-%d", data.ts) -- Group by day
-      dailyResults[day] = dailyResults[day] or {}
-      table.insert(dailyResults[day], parseData(data.data, realm, faction))
+    -- Organize scans by day
+    local dailyResults = {}
+    if #scanData >= 1 then
+      for _, data in ipairs(scanData) do
+        local day = date("%Y-%m-%d", data.ts) -- Group by day
+        dailyResults[day] = dailyResults[day] or {}
+        table.insert(dailyResults[day], parseData(data.data, realm, faction))
+      end
     end
+
+    -- Calculate daily averages
+    local dailyAverages = {}
+    for day, results in pairs(dailyResults) do
+      dailyAverages[day] = AA:averageOneDay(unpack(results))
+    end
+
+    -- Calculate dailys into final averages, save data
+    local dbField = (days == 7 and "oneWeekAvg") or 
+                  (days == 14 and "twoWeekAvg") or
+                  (days == 30 and "oneMonthAvg") or
+                  (days == 90 and "threeMonthAvg") or 
+                  (days == 180 and "sixMonthAvg")
+    print(dbField)
+    if AA.db.realm[faction] == nil then AA.db.realm[faction] = {} end
+    AA.db.realm[faction][dbField] = AA:averageAllDays(dailyAverages)
   end
-
-  -- Calculate daily averages
-  local dailyAverages = {}
-  for day, results in pairs(dailyResults) do
-    dailyAverages[day] = AA:mergeAndAverageDailyTables(unpack(results))
-  end
-
-
-  -- Merge daily averages into the final 7-day average
-  AA.db.realm.sevenDayAvg[realm .. "-" .. faction] = AA:mergeAndAverageWeeklyTables(dailyAverages)
 
   print("Finished Calculating Average!")
 end
 
-function AA:mergeAndAverageDailyTables(...)
+function AA:averageOneDay(...)
   local mergedData = {}
   local countData = {}
 
@@ -113,7 +127,7 @@ function AA:mergeAndAverageDailyTables(...)
   return mergedData
 end
 
-function AA:mergeAndAverageWeeklyTables(...)
+function AA:averageAllDays(...)
   local mergedData = {}
   local countData = {}
 
@@ -131,7 +145,7 @@ function AA:mergeAndAverageWeeklyTables(...)
     end
   end
 
-  -- Calculate the overall 7-day weighted average for each item
+  -- Calculate the overall weighted average for each item
   for itemID, total in pairs(mergedData) do
     if countData[itemID] > 0 then
       mergedData[itemID] = total / countData[itemID]
@@ -141,33 +155,53 @@ function AA:mergeAndAverageWeeklyTables(...)
   return mergedData
 end
 
-AucAvgGetAuctionInfoByLink = function(link)
+AucAvgGetAuctionInfoByLink = function(link, key)
   local itemID = select(2, strsplit(":", link)) -- Extract item ID from the item link
   local realm = GetNormalizedRealmName()
   local faction = UnitFactionGroup("PLAYER")
   if not itemID then
       return nil
   end
-  local auctionInfo = AA.db.realm.sevenDayAvg[realm .. "-" .. faction][itemID]
+  local auctionInfo = AA.db.realm[faction][key][itemID]
   if auctionInfo then
-      return { sevenDayAvg = auctionInfo }
+      return { [key] = auctionInfo }
   end
   return nil
 end
 
-  -- AucAvg
+--  -- AucAvg
 --  if Addon.IsEnabled("AucAvg") and AucAvgGetAuctionInfoByLink then
---    CustomString.InvalidateCache("SevenDayAvg")
+--    CustomString.InvalidateCache("OneWeekAvg")
+--    CustomString.InvalidateCache("TwoWeekAvg")
+--    CustomString.InvalidateCache("OneMonthAvg")
+--    CustomString.InvalidateCache("ThreeMonthAvg")
+--    CustomString.InvalidateCache("SixMonthAvg")
 --    local function PriceFuncHelper(itemString, key)
 --      local itemLink = ItemInfo.GetLink(itemString)
 --			if not itemLink then
 --				return nil
 --			end
---			local info = AucAvgGetAuctionInfoByLink(itemLink)
+--			local info = AucAvgGetAuctionInfoByLink(itemLink, key)
 --			return info and info[key] or nil
 --    end
---    local function SevenDayAvgFunc(itemString)
---      return PriceFuncHelper(itemString, "sevenDayAvg")
+--    local function OneWeekAvgFunc(itemString)
+--      return PriceFuncHelper(itemString, "oneWeekAvg")
 --    end
---    CustomString.RegisterSource("External", "SevenDayAvg", L["Seven Day Avg"], SevenDayAvgFunc, CustomString.SOURCE_TYPE.PRICE_DB) 
+--    local function TwoWeekAvgFunc(itemString)
+--      return PriceFuncHelper(itemString, "twoWeekAvg")
+--    end
+--    local function OneMonthAvgFunc(itemString)
+--      return PriceFuncHelper(itemString, "oneMonthAvg")
+--    end
+--    local function ThreeMonthAvgFunc(itemString)
+--      return PriceFuncHelper(itemString, "threeMonthAvg")
+--    end
+--    local function SixMonthAvgFunc(itemString)
+--      return PriceFuncHelper(itemString, "sixMonthAvg")
+--    end
+--    CustomString.RegisterSource("External", "OneWeekAvg", "One Week Avg", OneWeekAvgFunc, CustomString.SOURCE_TYPE.PRICE_DB) 
+--    CustomString.RegisterSource("External", "TwoWeekAvg", "Two Week Avg", TwoWeekAvgFunc, CustomString.SOURCE_TYPE.PRICE_DB) 
+--    CustomString.RegisterSource("External", "OneMonthAvg", "One Month Avg", OneMonthAvgFunc, CustomString.SOURCE_TYPE.PRICE_DB) 
+--    CustomString.RegisterSource("External", "ThreeMonthAvg", "Three Month Avg", ThreeMonthAvgFunc, CustomString.SOURCE_TYPE.PRICE_DB) 
+--    CustomString.RegisterSource("External", "SixMonthAvg", "Six Month Avg", SixMonthAvgFunc, CustomString.SOURCE_TYPE.PRICE_DB) 
 --  end
