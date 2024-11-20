@@ -127,12 +127,15 @@ function AA:averageOneDay(...)
   return mergedData
 end
 
-function AA:averageAllDays(...)
+function AA:averageAllDays(dailyAverages)
   local mergedData = {}
   local countData = {}
 
+  -- Filter outliers globally
+  local filteredAverages = AA:filterOutliersGlobally(dailyAverages)
+
   -- Process each table or numeric average independently
-  for date, priceTable in pairs(...) do
+  for date, priceTable in pairs(filteredAverages) do
     -- Sum the values in the sub-table and count the entries
     for itemID, price in pairs(priceTable) do
       if not mergedData[itemID] then
@@ -153,6 +156,50 @@ function AA:averageAllDays(...)
   end
 
   return mergedData
+end
+
+function AA:filterOutliersGlobally(dailyAverages)
+  -- Gather all prices for each itemID globally
+  local allPrices = {}
+  for _, dailyTable in pairs(dailyAverages) do
+    for itemID, price in pairs(dailyTable) do
+      allPrices[itemID] = allPrices[itemID] or {}
+      table.insert(allPrices[itemID], price)
+    end
+  end
+
+  -- Calculate the median for each itemID
+  local medians = {}
+  local function calculateMedian(prices)
+    table.sort(prices)
+    local n = #prices
+    if n % 2 == 0 then
+      return (prices[n / 2] + prices[n / 2 + 1]) / 2
+    else
+      return prices[math.ceil(n / 2)]
+    end
+  end
+
+  for itemID, prices in pairs(allPrices) do
+    medians[itemID] = calculateMedian(prices)
+  end
+
+  -- Filter outliers based on the global median
+  local filteredData = {}
+  for day, dailyTable in pairs(dailyAverages) do
+    filteredData[day] = {}
+    for itemID, price in pairs(dailyTable) do
+      local median = medians[itemID]
+      local lowerBound = median / 2.3
+      local upperBound = median * 2.3
+
+      if price >= lowerBound and price <= upperBound then
+        filteredData[day][itemID] = price
+      end
+    end
+  end
+
+  return filteredData
 end
 
 AucAvgGetAuctionInfoByLink = function(link, key)
