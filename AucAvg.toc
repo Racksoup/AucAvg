@@ -3,9 +3,8 @@
 ## Author: WindFish
 ## DefaultState: enabled
 ## SavedVariables: AucAvgDB
-## OptionalDeps: Ace3
+## OptionalDeps: Ace3, AuctionDB
 ## X-Embeds: Ace3
-## Dependencies: AuctionDB
 
 embeds.xml
 

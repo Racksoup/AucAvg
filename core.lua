@@ -190,8 +190,8 @@ function AA:filterOutliersGlobally(dailyAverages)
     filteredData[day] = {}
     for itemID, price in pairs(dailyTable) do
       local median = medians[itemID]
-      local lowerBound = median / 2.3
-      local upperBound = median * 2.3
+      local lowerBound = median / 6.0
+      local upperBound = median * 6.0
 
       if price >= lowerBound and price <= upperBound then
         filteredData[day][itemID] = price
@@ -252,3 +252,6 @@ end
 --    CustomString.RegisterSource("External", "ThreeMonthAvg", "Three Month Avg", ThreeMonthAvgFunc, CustomString.SOURCE_TYPE.PRICE_DB) 
 --    CustomString.RegisterSource("External", "SixMonthAvg", "Six Month Avg", SixMonthAvgFunc, CustomString.SOURCE_TYPE.PRICE_DB) 
 --  end
+
+------------- UPDATES ---------------
+-- settings to choose which averages are calculated
